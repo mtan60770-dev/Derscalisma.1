@@ -1,0 +1,8 @@
+{
+  "name": "Ders Çalışma Programı",
+  "description": "Öğrenciler için akıllı ders çalışma programı ve asistanı.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
