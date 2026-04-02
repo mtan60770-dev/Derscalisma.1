@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Task } from '../types';
-import { generateSmartSchedule } from '../services/geminiService';
+import { Task, User } from '../types';
+import { generateSmartSchedule, checkContentModeration } from '../services/geminiService';
 
 interface CreateProgramProps {
+  user: User;
   onBack: () => void;
   onSave: (tasks: Task[]) => void;
+  onViolation?: (reason: string) => void;
 }
 
-export const CreateProgram: React.FC<CreateProgramProps> = ({ onBack, onSave }) => {
+export const CreateProgram: React.FC<CreateProgramProps> = ({ user, onBack, onSave, onViolation }) => {
   const [activeTab, setActiveTab] = useState<'ai' | 'manual'>('manual');
   
   // AI State
@@ -27,6 +29,16 @@ export const CreateProgram: React.FC<CreateProgramProps> = ({ onBack, onSave }) 
   const handleGenerate = async () => {
     if (!topic) return;
     setLoading(true);
+
+    if (user.isAiModerationEnabled) {
+        const aiCheck = await checkContentModeration(topic);
+        if (aiCheck.isViolation) {
+            setLoading(false);
+            if (onViolation) onViolation(`Yapay Zeka Tespit Etti: ${aiCheck.reason} ("${topic}").`);
+            return;
+        }
+    }
+
     // Gemini 3 Pro with thinking
     const result = await generateSmartSchedule(topic, 3, 'medium');
     

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Focus Pro</string>
+    <string name="title_activity_main">Focus Pro</string>
+    <string name="package_name">com.focuspro.app</string>
+    <string name="custom_url_scheme">com.focuspro.app</string>
+</resources>

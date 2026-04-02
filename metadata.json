@@ -1,8 +1,5 @@
 {
-  "name": "Ders Çalışma Programı",
-  "description": "Öğrenciler için akıllı ders çalışma programı ve asistanı.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone"
-  ]
-}
+  "name": "Görevim",
+  "description": "Günlük görevler, cüz/sure takibi ve ödül sistemi içeren ibadet takibi uygulaması.",
+  "requestFramePermissions": []
+} 

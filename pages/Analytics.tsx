@@ -17,9 +17,28 @@ export const Analytics: React.FC<AnalyticsProps> = ({ tasks }) => {
     subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
   });
 
+  // Calculate weekly activity
+  const dayNames = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+  const weeklyActivity = Array(7).fill(0);
+  
+  const getDurationMinutes = (start: string, end: string) => {
+    if (!start || !end) return 45; // Default
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    return (endH * 60 + endM) - (startH * 60 + startM);
+  };
+
+  tasks.forEach(task => {
+    if (task.completed && task.dayIndex !== undefined) {
+      weeklyActivity[task.dayIndex] += getDurationMinutes(task.startTime, task.endTime);
+    }
+  });
+
+  const maxMinutes = Math.max(...weeklyActivity, 60); // Min 1 hour scale
+
   // Calculate time spent (mock estimate based on tasks)
-  const totalMinutes = tasks.length * 45; // Assumption: avg 45 mins
-  const completedMinutes = completed * 45;
+  const completedMinutes = weeklyActivity.reduce((a, b) => a + b, 0);
+  const totalMinutes = tasks.reduce((acc, t) => acc + getDurationMinutes(t.startTime, t.endTime), 0);
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark pb-28">
@@ -29,6 +48,32 @@ export const Analytics: React.FC<AnalyticsProps> = ({ tasks }) => {
 
       <div className="p-4 flex flex-col gap-6">
         
+        {/* Weekly Activity Chart */}
+        <div className="bg-white dark:bg-card-dark rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+            <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-6">HAFTALIK AKTİVİTE</h3>
+            <div className="flex items-end justify-between h-40 gap-2">
+                {weeklyActivity.map((minutes, idx) => {
+                    const height = (minutes / maxMinutes) * 100;
+                    const isToday = (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1) === idx;
+                    
+                    return (
+                        <div key={idx} className="flex-1 flex flex-col items-center gap-2">
+                            <div className="relative w-full flex flex-col items-center group">
+                                <div 
+                                    className={`w-full rounded-t-lg transition-all duration-500 ${isToday ? 'bg-primary shadow-glow shadow-primary/30' : 'bg-slate-200 dark:bg-slate-800 group-hover:bg-primary/40'}`}
+                                    style={{ height: `${Math.max(height, 5)}%` }}
+                                ></div>
+                                <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-black text-white text-[10px] px-2 py-1 rounded pointer-events-none whitespace-nowrap z-10">
+                                    {Math.floor(minutes / 60)}sa {minutes % 60}dk
+                                </div>
+                            </div>
+                            <span className={`text-[10px] font-black ${isToday ? 'text-primary' : 'text-slate-400'}`}>{dayNames[idx]}</span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+
         {/* Main Score Card */}
         <div className="bg-white dark:bg-card-dark rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col items-center">
             <div className="relative w-40 h-40 flex items-center justify-center mb-4">

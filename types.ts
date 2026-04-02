@@ -13,14 +13,25 @@ export enum ViewState {
   AI_TEST = 'AI_TEST',
   AI_VIDEO = 'AI_VIDEO',
   AI_SOLVER = 'AI_SOLVER',
+  GROUPS = 'GROUPS',
+  CONTEST = 'CONTEST',
+  SECURITY = 'SECURITY',
+  SPECIAL_EVENT_20 = 'SPECIAL_EVENT_20',
+  SPECIAL_EVENT_40 = 'SPECIAL_EVENT_40',
+  PAST_EXAMS = 'PAST_EXAMS',
+  AI_COMPETITION = 'AI_COMPETITION',
+  SPECIAL_EVENT_60 = 'SPECIAL_EVENT_60',
+  FRIENDS = 'FRIENDS',
+  FRIEND_PROFILE = 'FRIEND_PROFILE',
+  POPULARITY_RANKING = 'POPULARITY_RANKING',
 }
 
 export interface Task {
   id: string;
   title: string;
   subtitle?: string;
-  startTime: string; // HH:mm
-  endTime: string;   // HH:mm
+  startTime: string; 
+  endTime: string;   
   type: 'class' | 'study' | 'break';
   completed: boolean;
   color?: string;
@@ -34,38 +45,175 @@ export type ScoreType = 'written' | 'performance' | 'project';
 export interface Exam {
   id: string;
   subject: string;
-  date: string; // YYYY-MM-DD
-  time: string; // HH:mm
-  type: ScoreType; // New field
+  date: string; 
+  time: string; 
+  type: ScoreType; 
   targetScore: number;
   actualScore?: number;
 }
 
-export interface Goal {
-  id: string;
-  text: string;
-  completed: boolean;
+export interface SolvedQuestions {
+  total: number;
+  test: number;
+  classic: number;
+  performance: number;
+  bySubject: Record<string, number>;
+}
+
+export interface GiftRecord {
+  senderId: string;
+  senderName: string;
+  giftIcon: string;
+  timestamp: number;
 }
 
 export interface User {
-  id: string; // Unique ID
+  id: string;
   name: string;
-  password?: string; // New Password Field
-  schoolNumber?: string; // e-School style
-  className?: string;    // e-School style
-  grade?: number;        // 1-12 Grade Level
+  password?: string;
+  schoolNumber?: string;
+  className?: string;
+  grade: number;
   avatarUrl: string;
   progress: number;
   totalTasks: number;
   completedTasks: number;
   email?: string;
-  averageScore?: number;
   coins: number;
   diamonds: number; 
-  lastBonusClaimTime?: number; // Timestamp
-  streak: number; // Current day streak (1...31)
-  frameId?: string; // ID of the equipped frame
-  ownedFrames: string[]; // List of IDs of owned frames
-  friends?: string[]; // List of friend names (mock)
-  goals: Goal[]; // Personal study goals
+  lastBonusClaimTime?: number;
+  streak: number;
+  frameId?: string;
+  ownedFrames: string[];
+  ownedAvatars?: string[];
+  goals: any[];
+  badges?: Badge[];
+  claimedBadges?: string[];
+  completedMissionsToday?: string[];
+  averageScore?: number;
+  pinCode?: string;
+  isSecurityEnabled?: boolean;
+  isPrivacyModeEnabled?: boolean;
+  dailyGoalTasks?: number;
+  isDailyGoalActive?: boolean;
+  specialEventStartDate?: number;
+  specialEventProgress20?: number[]; // Array of completed day indices (0-19)
+  specialEventProgress40?: number[]; // Array of completed day indices (0-39)
+  specialEventProgress60?: number[]; // Array of completed day indices (0-59)
+  specialEventStartDate40?: number;
+  specialEventStartDate60?: number;
+  lastSpecialEventCompletionTime20?: number;
+  lastSpecialEventCompletionTime40?: number;
+  lastSpecialEventCompletionTime60?: number;
+  solvedQuestions?: SolvedQuestions;
+  loginSessions?: LoginSession[];
+  notifications?: Notification[];
+  is2FAEnabled?: boolean;
+  isBiometricEnabled?: boolean;
+  autoLockTimer?: number;
+  isSelfieVerificationActive?: boolean;
+  isSavedLoginInfoActive?: boolean;
+  isLoginLocationsActive?: boolean;
+  isLoginAlertsActive?: boolean;
+  isPersonalDetailsActive?: boolean;
+  isInfoAndTracesActive?: boolean;
+  isProActive?: boolean;
+  isAiModerationEnabled?: boolean;
+  isBanned?: boolean;
+  banReason?: string;
+  timeoutUntil?: number;
+  violationCount?: number;
+  timeoutReason?: string;
+  targetRankId?: string;
+  friends?: string[]; // Array of user IDs
+  blockedFriends?: string[]; // Array of user IDs
+  pinnedFriends?: string[]; // Array of user IDs
+  friendRequests?: string[]; // Array of user IDs
+  isFriendRequestsEnabled?: boolean;
+  friendChats?: Record<string, GroupMessage[]>; // Map of friendId to messages
+  popularity?: number;
+  dailyPopularity?: number;
+  weeklyPopularity?: number;
+  lastDailyReset?: number;
+  lastWeeklyReset?: number;
+  receivedGifts?: GiftRecord[];
+}
+
+export interface LoginSession {
+  id: string;
+  deviceName: string;
+  location: string;
+  lastActive: number;
+  isCurrent: boolean;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: number;
+  isRead: boolean;
+  type: 'update' | 'feature' | 'security' | 'system';
+}
+
+export interface Mission {
+    id: string;
+    title: string;
+    goal: string;
+    reward: number;
+    icon: string;
+    gradeRequirement?: number;
+}
+
+export interface Badge {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  requiredTasks?: number;
+  requirementValue?: number;
+  conditionType?: 'tasks' | 'coins' | 'streak' | 'diamonds' | 'security' | 'questions';
+  description: string;
+  rewardCoins?: number;
+}
+
+export interface Bot {
+  id: string;
+  name: string;
+  role: string;
+  avatar: string;
+  personality: string;
+}
+
+export interface GroupMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
+  type: 'system' | 'text' | 'gift' | 'bot';
+  giftIcon?: string;
+  isRead?: boolean;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description: string;
+  avatarUrl: string;
+  bannerUrl: string;
+  ownerId: string;
+  memberCount: number;
+  messages: GroupMessage[];
+  activeBots: string[];
+  isPrivate: boolean;
+  messageDelay: number;
+  securityLevel: 'high' | 'low';
+  isSubscriberOnly?: boolean;
+  isExpiringMessages?: boolean;
+  isVerificationRequired?: boolean;
+  isMuted?: boolean;
+  isDiscussionEnabled?: boolean;
+  isAutoTranslate?: boolean;
+  members?: string[];
 }

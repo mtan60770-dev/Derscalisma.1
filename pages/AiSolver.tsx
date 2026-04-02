@@ -1,15 +1,20 @@
 import React, { useState, useRef } from 'react';
 import { solveHomework } from '../services/geminiService';
+import { User } from '../types';
 
 interface AiSolverProps {
+    user: User;
+    onUpdateUser: (updates: Partial<User>) => void;
     onBack: () => void;
+    onViolation?: (reason: string) => void;
 }
 
-export const AiSolver: React.FC<AiSolverProps> = ({ onBack }) => {
+export const AiSolver: React.FC<AiSolverProps> = ({ user, onUpdateUser, onBack, onViolation }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [image, setImage] = useState<string | null>(null);
     const [solution, setSolution] = useState('');
     const [loading, setLoading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
 
     const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -19,6 +24,7 @@ export const AiSolver: React.FC<AiSolverProps> = ({ onBack }) => {
                 if (event.target?.result) {
                     setImage(event.target.result as string);
                     setSolution(''); // Reset previous solution
+                    setErrorMsg('');
                 }
             };
             reader.readAsDataURL(file);
@@ -27,20 +33,37 @@ export const AiSolver: React.FC<AiSolverProps> = ({ onBack }) => {
 
     const handleSolve = async () => {
         if (!image) return;
+        
+        const cost = user.isProActive ? 0 : 20;
+        if (user.coins < cost) {
+            setErrorMsg('Yetersiz Jeton! Çözüm için 20 jetona ihtiyacın var.');
+            return;
+        }
+
         setLoading(true);
+        setErrorMsg('');
         
         // Remove data:image/...;base64, prefix
         const base64Data = image.split(',')[1];
         const mimeType = image.split(';')[0].split(':')[1];
 
-        const result = await solveHomework(base64Data, mimeType);
-        setSolution(result);
-        setLoading(false);
+        try {
+            const result = await solveHomework(base64Data, mimeType);
+            setSolution(result);
+            if (cost > 0) {
+                onUpdateUser({ coins: user.coins - cost });
+            }
+        } catch (error) {
+            setErrorMsg('Çözüm alınırken bir hata oluştu.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleReset = () => {
         setImage(null);
         setSolution('');
+        setErrorMsg('');
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
@@ -56,6 +79,12 @@ export const AiSolver: React.FC<AiSolverProps> = ({ onBack }) => {
             </div>
 
             <div className="flex-1 p-6 flex flex-col items-center">
+                {errorMsg && (
+                    <div className="w-full max-w-sm mb-4 bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top">
+                        <span className="material-symbols-outlined">error</span>
+                        <p className="text-sm font-bold">{errorMsg}</p>
+                    </div>
+                )}
                 
                 {!image ? (
                     <div className="flex flex-col items-center justify-center flex-1 gap-6 w-full animate-in zoom-in-95">
@@ -122,7 +151,19 @@ export const AiSolver: React.FC<AiSolverProps> = ({ onBack }) => {
                                  ) : (
                                      <>
                                         <span className="material-symbols-outlined">auto_awesome</span>
-                                        <span>Çözümü Getir</span>
+                                        <span className="flex items-center gap-2">
+                                            Çözümü Getir 
+                                            {!user.isProActive && (
+                                                <span className="bg-black/20 px-2 py-0.5 rounded-md text-xs flex items-center gap-1">
+                                                    <span className="text-yellow-400">🪙</span> 20
+                                                </span>
+                                            )}
+                                            {user.isProActive && (
+                                                <span className="bg-purple-500/50 px-2 py-0.5 rounded-md text-[10px] uppercase tracking-widest">
+                                                    ÜCRETSİZ
+                                                </span>
+                                            )}
+                                        </span>
                                      </>
                                  )}
                              </button>

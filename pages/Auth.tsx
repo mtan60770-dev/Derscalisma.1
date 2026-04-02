@@ -30,8 +30,8 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
     setLoading(true);
     
-    // Simulate network delay for effect
-    await new Promise(r => setTimeout(r, 600));
+    // Simulate network delay for effect (5 seconds as requested)
+    await new Promise(r => setTimeout(r, 5000));
 
     const success = await onLogin(
         name.trim(), 
@@ -44,6 +44,9 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
     if (success) {
         setAnimating(true);
+        // We let the animation finish before App switches views if it's managed externally,
+        // or just let the re-render happen. To be safe with the logic:
+        await new Promise(r => setTimeout(r, 800));
     } else {
         setLoading(false);
         setError(mode === 'login' ? 'Kullanıcı adı veya şifre hatalı!' : 'Bu kullanıcı adı zaten kullanılıyor.');
@@ -185,7 +188,10 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 >
                     <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
                     {loading ? (
-                        <span className="material-symbols-outlined animate-spin">refresh</span>
+                        <>
+                            <span className="material-symbols-outlined animate-spin">refresh</span>
+                            <span className="relative text-lg">İndiriliyor...</span>
+                        </>
                     ) : (
                         <>
                             <span className="relative text-lg">{mode === 'login' ? 'Giriş Yap' : 'Hesap Oluştur'}</span>

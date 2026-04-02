@@ -18,14 +18,18 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({
   const [name, setName] = useState('');
   const [schoolNum, setSchoolNum] = useState('');
   const [className, setClassName] = useState('');
+  // Added grade state to fix missing property error
+  const [grade, setGrade] = useState<number>(9);
 
   const handleSave = () => {
       if (!name || !schoolNum) return;
+      // Fixed error: Added 'grade' property which is required in User interface
       const newUser: User = {
           id: `student-${Date.now()}`,
           name,
           schoolNumber: schoolNum,
           className: className,
+          grade: grade,
           avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuCixog0ga1gyp8KvF1wLdMDYPneLaJm_RyolUjv5Lbkl_r_f3vC7F2TK3yEbEH7KtSM4-7snlGLANiUvGt7U17ZOLKPa333uRdzc23HY2Fkb7S-EJwjCLdK16QmfubNUcreL5lqocir4QgMFqCMjiJC8si_fDeqeBP-M6o1Xb6kHrIitiLWbllOFh4ma4DC-w5yckvGBR6Pg79YQI9n8d-cMIA3MzE9PkiudcLe2OXa_rjFgAgGNBqGR2oK-sd9jz2Qsm5-xrTyrcc",
           progress: 0,
           totalTasks: 0,
@@ -37,7 +41,8 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({
           lastBonusClaimTime: 0,
           frameId: 'frame_0',
           ownedFrames: ['frame_0'],
-          goals: []
+          goals: [],
+          popularity: 0
       };
       onAddStudent(newUser);
       setMode('list');
@@ -72,10 +77,10 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({
                         onClick={() => onSwitchStudent(student.id)}
                         className={`bg-white dark:bg-[#1E293B] p-4 rounded-xl shadow-sm border-2 flex items-center gap-4 cursor-pointer transition-all active:scale-[0.98] ${student.id === currentUserId ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'}`}
                        >
-                           <img src={student.avatarUrl} className="w-12 h-12 rounded-full border border-gray-200" alt={student.name} />
+                           <img src={student.avatarUrl} className="w-12 h-12 rounded-full border border-gray-200" alt={student.name} referrerPolicy="no-referrer" />
                            <div className="flex-1">
                                <h3 className="font-bold text-slate-900 dark:text-white">{student.name}</h3>
-                               <p className="text-xs text-slate-500">{student.schoolNumber} - {student.className}</p>
+                               <p className="text-xs text-slate-500">{student.schoolNumber} - {student.className} ({student.grade}. Sınıf)</p>
                            </div>
                            {student.id === currentUserId && (
                                <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded-full">Aktif</span>
@@ -125,6 +130,19 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({
                                 placeholder="9-B"
                                />
                            </div>
+                       </div>
+                       {/* Added grade selection input */}
+                       <div>
+                           <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Eğitim Seviyesi (Sınıf)</label>
+                           <select 
+                            value={grade}
+                            onChange={e => setGrade(Number(e.target.value))}
+                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:border-primary appearance-none"
+                           >
+                               {[...Array(12)].map((_, i) => (
+                                   <option key={i} value={i + 1}>{i + 1}. Sınıf</option>
+                               ))}
+                           </select>
                        </div>
                    </div>
 
