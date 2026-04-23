@@ -245,7 +245,7 @@ export const Security: React.FC<SecurityProps> = ({ user, onBack, onUpdateUser, 
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400">
                     <span className="material-symbols-outlined">
-                      {session.deviceName.toLowerCase().includes('iphone') ? 'smartphone' : 'laptop'}
+                      { (session.deviceName || '').toLowerCase().includes('iphone') ? 'smartphone' : 'laptop'}
                     </span>
                   </div>
                   <div>

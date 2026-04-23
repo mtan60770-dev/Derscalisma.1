@@ -24,6 +24,8 @@ export enum ViewState {
   FRIENDS = 'FRIENDS',
   FRIEND_PROFILE = 'FRIEND_PROFILE',
   POPULARITY_RANKING = 'POPULARITY_RANKING',
+  DEVICE_POPULARITY = 'DEVICE_POPULARITY',
+  AI_VS_ARENA = 'AI_VS_ARENA',
 }
 
 export interface Task {
@@ -132,11 +134,22 @@ export interface User {
   isFriendRequestsEnabled?: boolean;
   friendChats?: Record<string, GroupMessage[]>; // Map of friendId to messages
   popularity?: number;
+  levelProgress?: number;
   dailyPopularity?: number;
   weeklyPopularity?: number;
   lastDailyReset?: number;
   lastWeeklyReset?: number;
+  rankQuestions?: number;
+  lastRankReset?: number;
   receivedGifts?: GiftRecord[];
+  sentGiftsCount: number;
+  profilePoints: number;
+  gloveCount: number;
+  pkHistory?: { result: 'win' | 'loss', timestamp: number }[];
+  activeItems?: {
+    name: string;
+    expiryDate: number;
+  }[];
 }
 
 export interface LoginSession {

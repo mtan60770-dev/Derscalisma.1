@@ -7,13 +7,25 @@ interface FriendProfileProps {
   friend: User;
   onBack: () => void;
   onSendCoins: (friendId: string, amount: number) => void;
-  onSendGift: (friendId: string, giftIcon: string, cost: number, popularity: number) => void;
+  onSendDiamonds: (friendId: string, amount: number) => void;
+  onSendGift: (friendId: string, giftIcon: string, cost: number, popularity: number, currency: 'coins' | 'diamonds') => void;
   currentUserCoins: number;
+  currentUserDiamonds: number;
   setChatFriend: (friend: User | null) => void;
+  diamondAnimation?: { amount: number; senderName: string } | null;
 }
 
-export const FriendProfile: React.FC<FriendProfileProps> = ({ friend, onBack, onSendCoins, onSendGift, currentUserCoins, setChatFriend }) => {
+export const FriendProfile: React.FC<FriendProfileProps> = ({ friend, onBack, onSendCoins, onSendDiamonds, onSendGift, currentUserCoins, currentUserDiamonds, setChatFriend, diamondAnimation }) => {
+  const [giftAnimation, setGiftAnimation] = useState<string | null>(null);
+
+  const triggerGiftAnimation = (icon: string) => {
+    setGiftAnimation(icon);
+    setTimeout(() => setGiftAnimation(null), 2000);
+  };
+ 
   const [amount, setAmount] = useState(50);
+  const [diamondAmount, setDiamondAmount] = useState(10);
+  const [giftQuantity, setGiftQuantity] = useState(1);
   const frame = FRAMES.find(f => f.id === friend.frameId) || FRAMES[0];
   const rank = getRank(friend.solvedQuestions?.total || 0);
 
@@ -23,6 +35,12 @@ export const FriendProfile: React.FC<FriendProfileProps> = ({ friend, onBack, on
     { icon: '✈️', cost: 200, popularity: 300 },
     { icon: '🚗', cost: 500, popularity: 800 },
     { icon: '⭐', cost: 1000, popularity: 1500 },
+  ];
+
+  const diamondGifts = [
+    { icon: '💎', cost: 50, popularity: 500 },
+    { icon: '👑', cost: 100, popularity: 1000 },
+    { icon: '🚀', cost: 200, popularity: 2000 },
   ];
 
   return (
@@ -67,32 +85,79 @@ export const FriendProfile: React.FC<FriendProfileProps> = ({ friend, onBack, on
             </div>
         </div>
 
+        {/* Gift Animation Overlay */}
+        {giftAnimation && (
+            <motion.div 
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 2, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+            >
+                <div className="text-8xl">{giftAnimation}</div>
+            </motion.div>
+        )}
+        
+        <div className="mt-4 w-full flex items-center gap-2 bg-white/5 p-2 rounded-xl">
+            <span className="text-xs font-bold">Adet:</span>
+            <input type="number" value={giftQuantity} onChange={(e) => setGiftQuantity(Math.max(1, Number(e.target.value)))} className="w-16 bg-white/10 p-1 rounded-lg text-center" />
+        </div>
+
         <div className="mt-4 w-full flex gap-2">
             {gifts.map(gift => (
                 <motion.button 
                     key={gift.icon} 
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    onClick={() => onSendGift(friend.id, gift.icon, gift.cost, gift.popularity)} 
-                    disabled={currentUserCoins < gift.cost}
+                    onClick={() => {
+                        onSendGift(friend.id, gift.icon, gift.cost * giftQuantity, gift.popularity * giftQuantity, 'coins');
+                        triggerGiftAnimation(gift.icon);
+                    }} 
+                    disabled={currentUserCoins < gift.cost * giftQuantity}
                     className="flex-1 flex flex-col items-center p-3 bg-white/5 rounded-xl disabled:opacity-50"
                 >
                     <span className="text-2xl">{gift.icon}</span>
-                    <span className="text-[10px] font-bold">{gift.cost} Coin</span>
+                    <span className="text-[10px] font-bold">{gift.cost * giftQuantity} Coin</span>
+                </motion.button>
+            ))}
+        </div>
+
+        <div className="mt-4 w-full flex gap-2">
+            {diamondGifts.map(gift => (
+                <motion.button 
+                    key={gift.icon} 
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => {
+                        onSendGift(friend.id, gift.icon, gift.cost * giftQuantity, gift.popularity * giftQuantity, 'diamonds');
+                        triggerGiftAnimation(gift.icon);
+                    }} 
+                    disabled={currentUserDiamonds < gift.cost * giftQuantity}
+                    className="flex-1 flex flex-col items-center p-3 bg-blue-900/20 border border-blue-500/30 rounded-xl disabled:opacity-50"
+                >
+                    <span className="text-2xl">{gift.icon}</span>
+                    <span className="text-[10px] font-bold text-blue-400">{gift.cost * giftQuantity} Elmas</span>
                 </motion.button>
             ))}
         </div>
 
         <div className="mt-6 w-full bg-white/5 p-4 rounded-xl flex justify-around items-center">
 
-          <div className="flex items-center gap-2">
+          <motion.div 
+            animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+            className="flex items-center gap-2"
+          >
             <span className="material-symbols-outlined text-yellow-400">monetization_on</span>
             <p className="font-bold">{friend.coins}</p>
-          </div>
-          <div className="flex items-center gap-2">
+          </motion.div>
+          <motion.div 
+            animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut", delay: 0.5 }}
+            className="flex items-center gap-2"
+          >
             <span className="material-symbols-outlined text-cyan-400">diamond</span>
             <p className="font-bold">{friend.diamonds}</p>
-          </div>
+          </motion.div>
         </div>
 
         <div className="mt-8 w-full bg-white/5 p-4 rounded-xl">
@@ -109,6 +174,23 @@ export const FriendProfile: React.FC<FriendProfileProps> = ({ friend, onBack, on
                 className="w-full bg-primary py-2 rounded-lg font-bold disabled:opacity-50"
             >
                 {amount > currentUserCoins ? 'Yetersiz Coin' : `${amount} Coin Gönder`}
+            </button>
+        </div>
+
+        <div className="mt-4 w-full bg-white/5 p-4 rounded-xl">
+            <h3 className="text-sm font-bold mb-2">Elmas Gönder</h3>
+            <input 
+                type="number" 
+                value={diamondAmount} 
+                onChange={(e) => setDiamondAmount(Number(e.target.value))}
+                className="w-full bg-white/10 p-2 rounded-lg mb-2"
+            />
+            <button 
+                onClick={() => onSendDiamonds(friend.id, diamondAmount)} 
+                disabled={diamondAmount > currentUserDiamonds || diamondAmount <= 0}
+                className="w-full bg-blue-500 py-2 rounded-lg font-bold disabled:opacity-50"
+            >
+                {diamondAmount > currentUserDiamonds ? 'Yetersiz Elmas' : `${diamondAmount} Elmas Gönder`}
             </button>
         </div>
       </div>

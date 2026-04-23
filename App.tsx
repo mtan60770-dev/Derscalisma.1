@@ -1,7 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
+import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import { ViewState, Task, User, Exam, GroupMessage, GiftRecord } from './types';
 import { motion } from 'framer-motion';
+import EmojiPicker from 'emoji-picker-react';
 import { evaluateAppeal } from './services/geminiService';
 import { Onboarding } from './pages/Onboarding';
 import { Auth } from './pages/Auth';
@@ -16,6 +19,7 @@ import { DailyBonus } from './pages/DailyBonus';
 import { StudentManagement } from './pages/StudentManagement';
 import { AiTest } from './pages/AiTest';
 import { AiCompetition } from './pages/AiCompetition';
+import { LivePk as AiVsArena } from './pages/LivePk';
 import { AiVideo } from './pages/AiVideo';
 import { AiSolver } from './pages/AiSolver';
 import { Groups } from './pages/Groups';
@@ -23,6 +27,7 @@ import { Contest } from './pages/Contest';
 import { Security } from './pages/Security';
 import { SpecialEvent } from './pages/SpecialEvent';
 import { PopularityRanking } from './pages/PopularityRanking';
+import { DevicePopularity } from './pages/DevicePopularity';
 import { Friends } from './pages/Friends';
 import { FriendProfile } from './pages/FriendProfile';
 import { BottomNav } from './components/BottomNav';
@@ -51,17 +56,15 @@ const defaultUser: User = {
   isPrivacyModeEnabled: false,
   isAiModerationEnabled: true,
   dailyGoalTasks: 5,
+  specialEventProgress20: [],
+  specialEventProgress40: [],
+  specialEventProgress60: [],
   solvedQuestions: {
-    total: 1250,
-    test: 850,
-    classic: 300,
-    performance: 100,
-    bySubject: {
-      "Matematik": 450,
-      "Türkçe": 320,
-      "Fen Bilimleri": 280,
-      "Sosyal Bilgiler": 200
-    }
+    total: 0,
+    test: 0,
+    classic: 0,
+    performance: 0,
+    bySubject: {}
   },
   loginSessions: [
     { id: '1', deviceName: 'iPhone 15 Pro', location: 'İstanbul, TR', lastActive: Date.now(), isCurrent: true },
@@ -70,7 +73,11 @@ const defaultUser: User = {
   notifications: [
     { id: 'n1', title: 'Yeni Güncelleme!', message: 'Haftalık ders programı görünümü yenilendi! Artık daha profesyonel bir çizelgeye sahipsin.', timestamp: Date.now(), isRead: false, type: 'update' },
     { id: 'n2', title: 'Güvenlik Merkezi', message: 'Hesabını daha güvenli hale getirmek için PIN kodu ve cihaz geçmişi özelliklerini kullanabilirsin.', timestamp: Date.now() - 3600000, isRead: false, type: 'feature' }
-  ]
+  ],
+  popularity: 0,
+  profilePoints: 0,
+  sentGiftsCount: 0,
+  activeItems: []
 };
 
 export default function App() {
@@ -80,15 +87,52 @@ export default function App() {
   const [updateText, setUpdateText] = useState("Güncelleme başlatılıyor...");
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadText, setDownloadText] = useState("Sisteme bağlanılıyor...");
-  const [view, setView] = useState<ViewState>(ViewState.ONBOARDING);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [students, setStudents] = useState<User[]>([defaultUser]);
+  const [view, setView] = useState<ViewState>(() => {
+    return (localStorage.getItem('focusApp_view') as ViewState) || ViewState.ONBOARDING;
+  });
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    const saved = localStorage.getItem('focusApp_tasks');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [exams, setExams] = useState<Exam[]>(() => {
+    const saved = localStorage.getItem('focusApp_exams');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [students, setStudents] = useState<User[]>([]);
   const [currentUserIndex, setCurrentUserIndex] = useState(0);
   const [isPinVerified, setIsPinVerified] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<User | null>(null);
   const [chatFriend, setChatFriend] = useState<User | null>(null);
   const [chatMsg, setChatMsg] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [diamondAnimation, setDiamondAnimation] = useState<{ amount: number; senderName: string } | null>(null);
+
+  const user = students[currentUserIndex] || defaultUser;
+  console.log("Current user:", user);
+
+  useEffect(() => {
+    localStorage.setItem('focusApp_view', view);
+  }, [view]);
+
+  useEffect(() => {
+    localStorage.setItem('focusApp_tasks', JSON.stringify(tasks));
+  }, [tasks]);
+
+  useEffect(() => {
+    localStorage.setItem('focusApp_exams', JSON.stringify(exams));
+  }, [exams]);
+
+  useEffect(() => {
+    console.log("User updated:", user);
+  }, [user]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const users: User[] = snapshot.docs.map(doc => doc.data() as User);
+      setStudents(users.length > 0 ? users : [defaultUser]);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Appeal State
   const [showAppeal, setShowAppeal] = useState(false);
@@ -96,7 +140,22 @@ export default function App() {
   const [isAppealing, setIsAppealing] = useState(false);
   const [appealResult, setAppealResult] = useState<{accepted: boolean, message: string} | null>(null);
 
-  const user = students[currentUserIndex];
+  useEffect(() => {
+    if (user.popularity !== 0 || (user.solvedQuestions?.total || 0) !== 0) {
+      updateUserState(u => ({ 
+        ...u, 
+        popularity: 0,
+        profilePoints: 0,
+        solvedQuestions: {
+          total: 0,
+          test: 0,
+          classic: 0,
+          performance: 0,
+          bySubject: {}
+        }
+      }));
+    }
+  }, []);
 
   useEffect(() => {
     if (chatFriend && user.friendChats && user.friendChats[chatFriend.id]) {
@@ -126,40 +185,56 @@ export default function App() {
     setChatMsg('');
   };
 
-  const sendGift = (friendId: string, giftIcon: string, cost: number, popularity: number) => {
-    if (user.coins >= cost) {
+  const sendGift = (friendId: string, giftIcon: string, cost: number, popularity: number, currency: 'coins' | 'diamonds') => {
+    if (currency === 'coins') {
+        if (user.coins < cost) return;
         updateUserState(u => ({...u, coins: u.coins - cost}));
-        const newGift: GiftRecord = {
-          senderId: user.id,
-          senderName: user.name,
-          giftIcon,
-          timestamp: Date.now()
-        };
-        setStudents(prev => prev.map(s => s.id === friendId ? {
-          ...s, 
-          popularity: (s.popularity || 0) + popularity,
-          dailyPopularity: (s.dailyPopularity || 0) + popularity,
-          weeklyPopularity: (s.weeklyPopularity || 0) + popularity,
-          receivedGifts: [...(s.receivedGifts || []), newGift]
-        } : s));
-        const newMsg: GroupMessage = {
-            id: Date.now().toString(),
-            senderId: user.id,
-            senderName: user.name,
-            text: 'Sana bir hediye gönderdim!',
-            timestamp: Date.now(),
-            type: 'gift',
-            giftIcon: giftIcon,
-            isRead: false
-        };
-        const currentChats = user.friendChats || {};
-        const friendChat = currentChats[friendId] || [];
-        updateUserState(u => ({...u, friendChats: { ...currentChats, [friendId]: [...friendChat, newMsg] } }));
+    } else {
+        console.log("Deducting diamonds in App.tsx", { currentDiamonds: user.diamonds, cost: cost });
+        if ((user.diamonds || 0) < cost) return;
+        updateUserState(u => ({...u, diamonds: (u.diamonds || 0) - cost}));
     }
+
+    const newGift: GiftRecord = {
+        senderId: user.id,
+        senderName: user.name,
+        giftIcon,
+        timestamp: Date.now()
+    };
+
+    // Update current user
+    updateUserState(u => ({
+        ...u,
+        dailyPopularity: (u.dailyPopularity || 0) + popularity,
+        weeklyPopularity: (u.weeklyPopularity || 0) + popularity,
+    }));
+
+    // Update friend
+    updateOtherUser(friendId, (friend) => ({
+        ...friend, 
+        popularity: (friend.popularity || 0) + popularity,
+        dailyPopularity: (friend.dailyPopularity || 0) + popularity,
+        weeklyPopularity: (friend.weeklyPopularity || 0) + popularity,
+        receivedGifts: [...(friend.receivedGifts || []), newGift]
+    }));
+    
+    const newMsg: GroupMessage = {
+        id: Date.now().toString(),
+        senderId: user.id,
+        senderName: user.name,
+        text: 'Sana bir hediye gönderdim!',
+        timestamp: Date.now(),
+        type: 'gift',
+        giftIcon: giftIcon,
+        isRead: false
+    };
+    const currentChats = user.friendChats || {};
+    const friendChat = currentChats[friendId] || [];
+    updateUserState(u => ({...u, friendChats: { ...currentChats, [friendId]: [...friendChat, newMsg] } }));
   };
 
   useEffect(() => {
-    const savedUsers = localStorage.getItem('focusApp_users');
+    const savedUsers = localStorage.getItem('focusApp_students');
     if (savedUsers) {
       try {
         const parsed = JSON.parse(savedUsers);
@@ -176,6 +251,9 @@ export default function App() {
               if (now - (u.lastWeeklyReset || 0) > FIVE_DAYS) {
                   updated.weeklyPopularity = 0;
                   updated.lastWeeklyReset = now;
+              }
+              if (updated.activeItems) {
+                  updated.activeItems = updated.activeItems.filter(item => item.expiryDate > now);
               }
               return updated;
           });
@@ -252,21 +330,64 @@ export default function App() {
     }
   }, [user.isSecurityEnabled, isPinVerified, view]);
 
-  const updateUserState = (updater: (u: User) => User) => {
-    setStudents(prev => {
-      const newStudents = [...prev];
-      newStudents[currentUserIndex] = updater(newStudents[currentUserIndex]);
-      localStorage.setItem('focusApp_users', JSON.stringify(newStudents));
-      return newStudents;
+  const updateUserState = async (updater: (u: User) => User) => {
+    const currentUser = students[currentUserIndex] || defaultUser;
+    const currentUserId = currentUser.id;
+    const updatedUser = updater(currentUser);
+    console.log("updateUserState", { 
+        currentDiamonds: currentUser.diamonds, 
+        updatedDiamonds: updatedUser.diamonds,
+        updater: updater.toString()
     });
+    
+    // Create a copy to modify for Firestore
+    const userToSave = { ...updatedUser };
+    
+    // Ensure arrays are not undefined
+    userToSave.specialEventProgress20 = userToSave.specialEventProgress20 || [];
+    userToSave.specialEventProgress40 = userToSave.specialEventProgress40 || [];
+    userToSave.specialEventProgress60 = userToSave.specialEventProgress60 || [];
+
+    // Remove undefined fields
+    Object.keys(userToSave).forEach(key => {
+        if ((userToSave as any)[key] === undefined) {
+            delete (userToSave as any)[key];
+        }
+    });
+    
+    // Truncate friendChats to avoid document size limit
+    if (userToSave.friendChats) {
+        for (const friendId in userToSave.friendChats) {
+            if (userToSave.friendChats[friendId].length > 50) {
+                userToSave.friendChats[friendId] = userToSave.friendChats[friendId].slice(-50);
+            }
+        }
+    }
+    
+    // Update local state
+    if (students.length > 0) {
+        const updatedStudents = students.map(s => s.id === currentUserId ? userToSave : s);
+        setStudents(updatedStudents);
+        localStorage.setItem('focusApp_students', JSON.stringify(updatedStudents));
+    }
+    
+    // Update Firestore
+    console.log("Updating Firestore for user:", currentUserId, "with data:", userToSave);
+    await setDoc(doc(db, 'users', currentUserId), userToSave as any, { merge: true });
   };
 
-  const updateOtherUser = (userId: string, data: Partial<User>) => {
-    setStudents(prev => {
-      const updated = prev.map(s => s.id === userId ? {...s, ...data} : s);
-      localStorage.setItem('focusApp_users', JSON.stringify(updated));
-      return updated;
-    });
+  const resetAllPopularity = async () => {
+    for (const student of students) {
+        await setDoc(doc(db, 'users', student.id), { popularity: 0, dailyPopularity: 0, weeklyPopularity: 0 }, { merge: true });
+    }
+  };
+
+  const updateOtherUser = async (userId: string, updaterOrData: Partial<User> | ((u: User) => User)) => {
+    const friend = students.find(s => s.id === userId);
+    if (!friend) return;
+    const updatedFriend = typeof updaterOrData === 'function' ? updaterOrData(friend) : { ...friend, ...updaterOrData };
+    await setDoc(doc(db, 'users', userId), updatedFriend as any, { merge: true });
+    setStudents(prev => prev.map(s => s.id === userId ? updatedFriend : s));
   };
 
   const handleBuyFrame = (frameId: string, cost: number) => {
@@ -282,10 +403,36 @@ export default function App() {
       return false;
   };
 
+  const purchaseTimedItem = (item: { name: string, cost: number, durationDays: number }) => {
+    if (user.coins >= item.cost) {
+      updateUserState(u => ({
+        ...u,
+        coins: u.coins - item.cost,
+        activeItems: [
+          ...(u.activeItems || []),
+          { name: item.name, expiryDate: Date.now() + item.durationDays * 24 * 60 * 60 * 1000 }
+        ]
+      }));
+      return true;
+    }
+    return false;
+  };
+
   const handleSendCoins = (friendId: string, amount: number) => {
       if (user.coins >= amount) {
           updateUserState(u => ({...u, coins: u.coins - amount}));
-          setStudents(prev => prev.map(s => s.id === friendId ? {...s, coins: (s.coins || 0) + amount} : s));
+          updateOtherUser(friendId, (friend) => ({...friend, coins: (friend.coins || 0) + amount}));
+          return true;
+      }
+      return false;
+  };
+
+  const handleSendDiamonds = (friendId: string, amount: number) => {
+      if ((user.diamonds || 0) >= amount) {
+          updateUserState(u => ({...u, diamonds: (u.diamonds || 0) - amount}));
+          updateOtherUser(friendId, (friend) => ({...friend, diamonds: (friend.diamonds || 0) + amount}));
+          setDiamondAnimation({ amount, senderName: user.name });
+          setTimeout(() => setDiamondAnimation(null), 3000);
           return true;
       }
       return false;
@@ -293,19 +440,26 @@ export default function App() {
 
   const handleLogin = async (name: string, password: string, email: string, grade: number, rememberMe: boolean, isRegister: boolean): Promise<boolean> => {
     if (isRegister) {
-      const newUser: User = { ...defaultUser, id: `student-${Date.now()}`, name, password, email, grade };
-      const updated = [...students, newUser];
-      setStudents(updated);
-      setCurrentUserIndex(updated.length - 1);
-      localStorage.setItem('focusApp_users', JSON.stringify(updated));
+      // Improved ID generation
+      const newId = `FOCUS-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const newUser: User = { ...defaultUser, id: newId, name, password, email, grade };
+      await setDoc(doc(db, 'users', newUser.id), newUser);
+      
+      // Update local state
+      const updatedStudents = [...students, newUser];
+      setStudents(updatedStudents);
+      setCurrentUserIndex(updatedStudents.length - 1);
+      
       if (rememberMe) localStorage.setItem('focusApp_currentUserId', newUser.id);
+      localStorage.setItem('focusApp_students', JSON.stringify(updatedStudents));
+      
       setView(ViewState.DASHBOARD);
       return true;
     } else {
-      const idx = students.findIndex(s => s.name.toLowerCase() === name.toLowerCase() && s.password === password);
-      if (idx !== -1) {
-        setCurrentUserIndex(idx);
-        if (rememberMe) localStorage.setItem('focusApp_currentUserId', students[idx].id);
+      const userIndex = students.findIndex(s => (s.name || '').toLowerCase() === (name || '').toLowerCase() && s.password === password);
+      if (userIndex !== -1) {
+        setCurrentUserIndex(userIndex);
+        if (rememberMe) localStorage.setItem('focusApp_currentUserId', students[userIndex].id);
         setView(ViewState.DASHBOARD);
         return true;
       }
@@ -317,6 +471,7 @@ export default function App() {
       updateUserState(u => ({
           ...u,
           coins: u.coins + reward,
+          profilePoints: (u.profilePoints || 0) + reward,
           completedMissionsToday: [...(u.completedMissionsToday || []), missionId]
       }));
   };
@@ -378,7 +533,8 @@ export default function App() {
           total: solved.total + count,
           [type]: (solved as any)[type] + count,
           bySubject: newBySubject
-        }
+        },
+        profilePoints: (u.profilePoints || 0) + count
       };
     });
   };
@@ -467,23 +623,48 @@ export default function App() {
           onLogout={() => { localStorage.removeItem('focusApp_currentUserId'); setView(ViewState.AUTH); }} 
         />;
       case ViewState.AI_TEST: return <AiTest user={user} onBack={() => setView(ViewState.DASHBOARD)} onEarnCoins={(amt) => updateUserState(u => ({...u, coins: u.coins + amt}))} onUpdateSolvedQuestions={handleUpdateSolvedQuestions} onUpdateUser={(data) => updateUserState(u => ({...u, ...data}))} onViolation={handleViolation} onChangeView={setView} />;
-      case ViewState.AI_COMPETITION: return <AiCompetition user={user} onBack={() => setView(ViewState.DASHBOARD)} onUpdateUser={(data) => updateUserState(u => ({...u, ...data}))} onViolation={handleViolation} />;
+      case ViewState.AI_COMPETITION: return <AiCompetition user={user} allUsers={students} onBack={() => setView(ViewState.DASHBOARD)} onUpdateUser={(data) => updateUserState(u => ({...u, ...data}))} onViolation={handleViolation} />;
+      case ViewState.AI_VS_ARENA: return <AiVsArena user={user} allUsers={students} onBack={() => setView(ViewState.DASHBOARD)} onUpdateUser={(data) => updateUserState(u => ({...u, ...data}))} />;
       case ViewState.AI_VIDEO: return <AiVideo user={user} onBack={() => setView(ViewState.DASHBOARD)} onViolation={handleViolation} />;
       case ViewState.AI_SOLVER: return <AiSolver user={user} onUpdateUser={(data) => updateUserState(u => ({...u, ...data}))} onBack={() => setView(ViewState.DASHBOARD)} onViolation={handleViolation} />;
       case ViewState.PAST_EXAMS: return <PastExams user={user} onBack={() => setView(ViewState.DASHBOARD)} />;
       case ViewState.DAILY_BONUS: return <DailyBonus user={user} onBack={() => setView(ViewState.DASHBOARD)} onClaim={(amount) => { 
-          updateUserState(u => ({...u, coins: u.coins + amount, streak: u.streak + 1, lastBonusClaimTime: Date.now()})); 
+          updateUserState(u => ({
+              ...u, 
+              coins: (u.coins || 0) + amount, 
+              streak: (u.streak || 0) + 1, 
+              lastBonusClaimTime: Date.now()
+          })); 
           return true; 
       }} />;
       case ViewState.ADD_EXAM: return <AddExam onBack={() => setView(ViewState.DASHBOARD)} user={user} onSave={(exam) => { setExams([...exams, exam]); setView(ViewState.DASHBOARD); }} />;
       case ViewState.CONTEST: return <Contest user={user} students={students} onBack={() => setView(ViewState.DASHBOARD)} />;
       case ViewState.SECURITY: return <Security user={user} onBack={() => setView(ViewState.PROFILE)} onUpdateUser={(data) => updateUserState(u => ({...u, ...data}))} onViolation={handleViolation} />;
       case ViewState.SPECIAL_EVENT_20: return <SpecialEvent user={user} onBack={() => setView(ViewState.DASHBOARD)} onCompleteDay={(d, r) => handleCompleteSpecialDay(d, r, 20)} onUpdateUser={(data) => updateUserState(u => ({...u, ...data}))} eventDuration={20} />;
-      case ViewState.POPULARITY_RANKING: return <PopularityRanking students={students} onBack={() => setView(ViewState.DASHBOARD)} />;
+      case ViewState.POPULARITY_RANKING: return <PopularityRanking user={user} students={students} triggerNotif={(m) => { /* Could use a more global toast notification here if one existed, but this fulfills the interface requirement */ console.log(m); }} onUpdateOtherUser={(userId, dataOrUpdater) => {
+          if (typeof dataOrUpdater === 'function') {
+              updateOtherUser(userId, dataOrUpdater);
+          } else {
+              updateOtherUser(userId, dataOrUpdater);
+          }
+      }} onBack={() => setView(ViewState.DASHBOARD)} onSelectFriend={(friend) => { setSelectedFriend(friend); setView(ViewState.FRIEND_PROFILE); }} onChangeView={setView} />;
+      case ViewState.DEVICE_POPULARITY: return <DevicePopularity students={students} onBack={() => setView(ViewState.DASHBOARD)} />;
       case ViewState.SPECIAL_EVENT_40: return <SpecialEvent user={user} onBack={() => setView(ViewState.DASHBOARD)} onCompleteDay={(d, r) => handleCompleteSpecialDay(d, r, 40)} onUpdateUser={(data) => updateUserState(u => ({...u, ...data}))} eventDuration={40} />;
       case ViewState.SPECIAL_EVENT_60: return <SpecialEvent user={user} onBack={() => setView(ViewState.DASHBOARD)} onCompleteDay={(d, r) => handleCompleteSpecialDay(d, r, 60)} onUpdateUser={(data) => updateUserState(u => ({...u, ...data}))} eventDuration={60} />;
-      case ViewState.FRIENDS: return <Friends user={user} students={students} onBack={() => setView(ViewState.DASHBOARD)} onUpdateUser={(data) => updateUserState(u => ({...u, ...data}))} onUpdateOtherUser={updateOtherUser} onSelectFriend={(friend) => { setSelectedFriend(friend); setView(ViewState.FRIEND_PROFILE); }} setChatFriend={setChatFriend} />;
-      case ViewState.FRIEND_PROFILE: return selectedFriend ? <FriendProfile friend={selectedFriend} onBack={() => setView(ViewState.FRIENDS)} onSendCoins={handleSendCoins} onSendGift={sendGift} currentUserCoins={user.coins} setChatFriend={setChatFriend} /> : null;
+      case ViewState.FRIENDS: return <Friends user={user} students={students} onBack={() => setView(ViewState.DASHBOARD)} onUpdateUser={(dataOrUpdater) => {
+          if (typeof dataOrUpdater === 'function') {
+              updateUserState(dataOrUpdater);
+          } else {
+              updateUserState(u => ({...u, ...dataOrUpdater}));
+          }
+      }} onUpdateOtherUser={(userId, dataOrUpdater) => {
+          if (typeof dataOrUpdater === 'function') {
+              updateOtherUser(userId, dataOrUpdater);
+          } else {
+              updateOtherUser(userId, dataOrUpdater);
+          }
+      }} onSelectFriend={(friend) => { setSelectedFriend(friend); setView(ViewState.FRIEND_PROFILE); }} setChatFriend={setChatFriend} />;
+      case ViewState.FRIEND_PROFILE: return selectedFriend ? <FriendProfile friend={selectedFriend} onBack={() => setView(ViewState.FRIENDS)} onSendCoins={handleSendCoins} onSendDiamonds={handleSendDiamonds} onSendGift={sendGift} currentUserCoins={user.coins} currentUserDiamonds={user.diamonds || 0} setChatFriend={setChatFriend} diamondAnimation={diamondAnimation} /> : null;
       default: return <Dashboard user={user} tasks={tasks} exams={exams} onTaskToggle={() => {}} onChangeView={setView} onSpendCoins={() => true} onUpdateExamScore={() => {}} onBuyDiamonds={() => true} onExchange={() => true} onCompleteMission={() => {}} onViolation={handleViolation} />;
     }
   };
@@ -517,7 +698,7 @@ export default function App() {
                     </div>
                 ))}
             </div>
-            <div className="flex gap-2 mb-2">
+            <div className="flex gap-2 mb-2 overflow-x-auto pb-2">
                 {[
                     { icon: '🎁', cost: 50, popularity: 100 },
                     { icon: '❤️', cost: 100, popularity: 200 },
@@ -525,16 +706,29 @@ export default function App() {
                     { icon: '🚗', cost: 500, popularity: 800 },
                     { icon: '⭐', cost: 1000, popularity: 1500 },
                 ].map(gift => (
-                    <button key={gift.icon} onClick={() => sendGift(chatFriend.id, gift.icon, gift.cost, gift.popularity)} className="flex flex-col items-center p-2 bg-white/5 rounded-xl">
+                    <div key={gift.icon} className="flex flex-col items-center p-2 bg-white/5 rounded-xl gap-1 min-w-[80px]">
                         <span className="text-2xl">{gift.icon}</span>
-                        <span className="text-[10px] font-bold">{gift.cost} Coin</span>
-                    </button>
+                        <div className="flex gap-1">
+                            <button onClick={() => sendGift(chatFriend.id, gift.icon, gift.cost, gift.popularity, 'coins')} className="text-[9px] font-bold bg-yellow-500/20 text-yellow-500 px-1 py-0.5 rounded">{gift.cost} C</button>
+                            <button onClick={() => sendGift(chatFriend.id, gift.icon, gift.cost, gift.popularity, 'diamonds')} className="text-[9px] font-bold bg-blue-500/20 text-blue-500 px-1 py-0.5 rounded">{gift.cost} D</button>
+                        </div>
+                    </div>
                 ))}
             </div>
-            <div className="flex gap-2">
+                        <div className="flex gap-2">
+                <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="bg-white/10 text-white p-3 rounded-xl">😊</button>
                 <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} className="flex-1 bg-white/5 p-3 rounded-xl" placeholder="Mesaj..." />
                 <button onClick={sendMessage} className="bg-tg-blue text-white px-4 py-2 rounded-xl font-bold">Gönder</button>
             </div>
+            {showEmojiPicker && (
+                <div className="absolute bottom-20 right-6 z-[2001]">
+                    <EmojiPicker onEmojiClick={(emojiData) => {
+                        setChatMsg(prev => prev + emojiData.emoji);
+                        setShowEmojiPicker(false);
+                    }} />
+                </div>
+            )}
+
         </div>
       )}
       {isUpdating && (
@@ -639,6 +833,16 @@ export default function App() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {diamondAnimation && (
+        <div className="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-8">
+            <div className="bg-[#1E293B] p-8 rounded-3xl border border-white/10 flex flex-col items-center gap-4 text-center">
+                <span className="text-6xl animate-bounce">💎</span>
+                <h2 className="text-2xl font-black text-white">{diamondAnimation.amount} Elmas Gönderildi!</h2>
+                <p className="text-slate-400">Arkadaşına başarıyla elmas gönderdin.</p>
+            </div>
         </div>
       )}
 

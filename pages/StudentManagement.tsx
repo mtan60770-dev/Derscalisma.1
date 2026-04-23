@@ -42,7 +42,11 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({
           frameId: 'frame_0',
           ownedFrames: ['frame_0'],
           goals: [],
-          popularity: 0
+          popularity: 0,
+          profilePoints: 0,
+          sentGiftsCount: 0,
+          completedMissionsToday: [],
+          activeItems: []
       };
       onAddStudent(newUser);
       setMode('list');

@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Group, GroupMessage, User, Bot } from '../types';
 import { getBotResponse, checkContentModeration } from '../services/geminiService';
+import { getLevel } from '../constants';
 
 const AVAILABLE_BOTS: Bot[] = [
     { id: 'bot_math', name: 'Matematik Pro', role: 'Ders Asistanı', avatar: 'https://api.dicebear.com/9.x/bottts/svg?seed=Math', personality: 'Ciddi, her matematik problemini saniyeler içinde çözer.' },
@@ -128,7 +129,7 @@ export const Groups: React.FC<GroupsProps> = ({ user, allUsers, onSpendCoins, on
         // AI Moderation Check
         if (user.isAiModerationEnabled && !giftIcon) {
             const badWords = ['hile', 'hack', 'kopya', 'aptal', 'salak', 'küfür', 'bot basma', 'cevap anahtarı'];
-            const lowerMsg = msgInput.toLowerCase();
+            const lowerMsg = (msgInput || '').toLowerCase();
             const hasBadWord = badWords.some(word => lowerMsg.includes(word));
             
             if (hasBadWord) {
@@ -383,7 +384,12 @@ export const Groups: React.FC<GroupsProps> = ({ user, allUsers, onSpendCoins, on
                                         <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                                             <div className={`max-w-[85%] p-4 rounded-3xl shadow-tg relative transition-all ${isMe ? 'bg-tg-out text-white rounded-tr-none' : (isBot ? 'bg-[#2b2d42] border border-indigo-500/30' : 'bg-tg-msg text-white rounded-tl-none')}`}>
                                                 <div className="flex items-center justify-between mb-1 gap-4">
-                                                    <p className={`text-[10px] font-black uppercase tracking-widest ${isBot ? 'text-indigo-400' : isMe ? 'text-blue-200' : 'text-tg-blue'}`}>{msg.senderName}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className={`text-[10px] font-black uppercase tracking-widest ${isBot ? 'text-indigo-400' : isMe ? 'text-blue-200' : 'text-tg-blue'}`}>{msg.senderName}</p>
+                                                        {!isBot && !isSystem && (
+                                                            <span className="text-[8px] bg-white/10 px-1.5 py-0.5 rounded-md text-white/70 font-black">LVL {getLevel(allUsers.find(u => u.id === msg.senderId)?.solvedQuestions?.total || 0)}</span>
+                                                        )}
+                                                    </div>
                                                 </div>
 
                                                 {msg.type === 'gift' ? (
@@ -547,6 +553,7 @@ export const Groups: React.FC<GroupsProps> = ({ user, allUsers, onSpendCoins, on
                             <button onClick={() => setView('chat')} className="text-slate-400 p-1"><span className="material-symbols-outlined">arrow_back</span></button>
                             <h1 className="text-lg font-black italic uppercase tracking-tighter">GÜVENLİK PANELİ</h1>
                         </div>
+                        <button onClick={() => showToast('Ayarlar başarıyla kaydedildi!')} className="px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-black uppercase italic">KAYDET</button>
                     </header>
                     <div className="p-6 space-y-8">
                         <div className="bg-[#17212B] rounded-[3rem] p-8 border border-white/10 text-center">

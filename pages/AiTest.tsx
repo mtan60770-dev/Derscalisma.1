@@ -39,16 +39,17 @@ export const AiTest: React.FC<AiTestProps> = ({ user, onBack, onEarnCoins, onUpd
         }
     }, [isAnswered]);
 
-    const handleStart = async (selectedSubject?: string) => {
+    const handleStart = async (selectedSubject?: string, count?: number) => {
         const finalSubject = selectedSubject || subject;
+        const finalCount = count || questionCount;
         if (!finalSubject) return;
 
         setStep('loading');
 
         // AI Moderation Check
-        if (user.isAiModerationEnabled) {
+        if (user.isAiModerationEnabled && finalSubject !== 'Karışık') {
             const badWords = ['hile', 'hack', 'kopya', 'aptal', 'salak', 'küfür', 'bot basma', 'cevap anahtarı', 'cevapları ver'];
-            const lowerSubject = finalSubject.toLowerCase();
+            const lowerSubject = (finalSubject || '').toLowerCase();
             const hasBadWord = badWords.some(word => lowerSubject.includes(word));
             
             if (hasBadWord) {
@@ -66,9 +67,13 @@ export const AiTest: React.FC<AiTestProps> = ({ user, onBack, onEarnCoins, onUpd
             }
         }
 
-        const data = await generateQuiz(finalSubject, level, questionType, questionCount);
+        const data = await generateQuiz(finalSubject, level, questionType, finalCount);
         if (data.length > 0) {
             setQuestions(data);
+            setCurrentIndex(0);
+            setScore(0);
+            setIsAnswered(false);
+            setSelectedOption(null);
             setStep('quiz');
         } else {
             setStep('setup');
@@ -98,6 +103,16 @@ export const AiTest: React.FC<AiTestProps> = ({ user, onBack, onEarnCoins, onUpd
                     <div className="space-y-8 animate-in slide-in-from-bottom">
                         <section className="bg-gradient-to-br from-indigo-900/40 via-purple-900/20 to-black/40 p-8 rounded-[2.5rem] border border-white/10 shadow-2xl shadow-black/50 backdrop-blur-sm">
                             <h2 className="text-xl font-black italic mb-4">ÖZEL TEST ÜRET</h2>
+                            <button onClick={() => {
+                                setSubject('Karışık');
+                                setLevel('Orta');
+                                setQuestionType('test');
+                                setQuestionCount(50);
+                                handleStart('Karışık', 50);
+                            }} className="w-full py-4 bg-gradient-to-r from-tg-blue to-indigo-600 text-white rounded-2xl font-black shadow-glow active:scale-95 transition-transform mb-4 flex items-center justify-center gap-2">
+                                <span className="material-symbols-outlined">bolt</span>
+                                HIZLI TEST BAŞLAT (50 SORU)
+                            </button>
                             <div className="space-y-4">
                                 <input 
                                     value={subject}
@@ -111,7 +126,7 @@ export const AiTest: React.FC<AiTestProps> = ({ user, onBack, onEarnCoins, onUpd
                                     ))}
                                 </div>
                                 <div className="flex gap-2">
-                                    {[5, 10, 15, 20, 30].map(c => (
+                                    {[5, 10, 20, 30, 40].map(c => (
                                         <button key={c} onClick={() => setQuestionCount(c)} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${questionCount === c ? 'bg-tg-blue shadow-glow' : 'bg-white/5 border border-white/10'}`}>{c} Soru</button>
                                     ))}
                                 </div>

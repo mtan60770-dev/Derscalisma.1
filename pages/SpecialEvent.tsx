@@ -103,10 +103,11 @@ export const SpecialEvent: React.FC<SpecialEventProps> = ({ user, onBack, onComp
   };
 
   const handleComplete = (idx: number) => {
-    if (!completedDays.includes(idx) && canClaim) {
+    if (!completedDays.includes(idx)) {
       onCompleteDay(idx, SPECIAL_DAYS[idx].reward, eventDuration);
       setSelectedDay(null);
       setCanClaim(false);
+      setIsStudying(false);
     }
   };
 
@@ -275,6 +276,7 @@ export const SpecialEvent: React.FC<SpecialEventProps> = ({ user, onBack, onComp
               whileTap={{ scale: 0.98 }}
               disabled={completedDays.includes(selectedDay) || isStudying || (cooldownTime && !completedDays.includes(selectedDay))}
               onClick={() => {
+                if (isStudying) return;
                 if (canClaim) handleComplete(selectedDay);
                 else handleStartStudy();
               }}

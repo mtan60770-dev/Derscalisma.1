@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      // UYARI: Bu kurallar şu anda güvensizdir çünkü Firebase Auth kullanılmamaktadır.
+      // Uygulamanın çalışması için herkese açık erişim verilmiştir.
+      allow read, write: if true;
+    }
+  }
+}

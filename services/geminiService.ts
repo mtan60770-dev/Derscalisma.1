@@ -232,7 +232,7 @@ export const solveHomework = async (imageBase64: string, mimeType: string): Prom
     }
 };
 
-export const generateQuiz = async (subject: string, level: string, type: 'test' | 'classic', count: number = 3): Promise<QuizQuestion[]> => {
+export const generateQuiz = async (subject: string, level: string, type: 'test' | 'classic', count: number = 50): Promise<QuizQuestion[]> => {
     try {
         const schema = {
             type: Type.ARRAY,
@@ -249,11 +249,12 @@ export const generateQuiz = async (subject: string, level: string, type: 'test' 
             }
           };
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: `Generate ${count} quiz questions for ${subject}.`,
+            model: 'gemini-3.1-flash-lite-preview',
+            contents: `Generate ${count} ${type} questions for "${subject}" at "${level}" level. Ensure the questions are different from previous ones by using a random seed: ${Math.random()}.`,
             config: { 
                 responseMimeType: 'application/json', 
                 responseSchema: schema,
+                temperature: 0.7, // Increased temperature for more variety
                 ...SPEED_CONFIG,
                 safetySettings: DEFAULT_SAFETY_SETTINGS
             }

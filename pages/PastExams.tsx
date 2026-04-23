@@ -108,11 +108,11 @@ export const PastExams: React.FC<PastExamsProps> = ({ user, onBack }) => {
     if (downloadingId !== null) return;
     setDownloadingId(idx);
     
-    // Simulate download animation delay (15 seconds)
+    // Simulate download animation delay (1.5 seconds)
     setTimeout(() => {
       window.open(url, '_blank');
       setDownloadingId(null);
-    }, 15000);
+    }, 1500);
   };
 
   return (
@@ -130,17 +130,17 @@ export const PastExams: React.FC<PastExamsProps> = ({ user, onBack }) => {
       <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-32">
         
         {/* Sınıf Seçimi */}
-        <div>
-          <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">SINIF SEÇİMİ</h2>
-          <div className="flex overflow-x-auto gap-3 pb-4 no-scrollbar">
+        <div className="bg-[#1e293b] p-4 rounded-3xl border border-white/5">
+          <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 ml-2">SINIF SEÇİMİ</h2>
+          <div className="grid grid-cols-4 gap-2">
             {GRADES.map(grade => (
               <button
                 key={grade.id}
                 onClick={() => setSelectedGrade(grade.id)}
-                className={`px-6 py-3 rounded-2xl font-black text-xs uppercase whitespace-nowrap transition-all border-2 ${
+                className={`px-3 py-3 rounded-2xl font-black text-[10px] uppercase transition-all border-2 ${
                   selectedGrade === grade.id 
                     ? 'bg-primary border-primary text-white shadow-glow' 
-                    : 'bg-[#1e293b] border-white/5 text-slate-400 hover:border-white/20'
+                    : 'bg-black/20 border-white/5 text-slate-400 hover:border-white/20'
                 }`}
               >
                 {grade.name}

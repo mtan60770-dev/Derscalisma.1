@@ -16,9 +16,9 @@ export const Contest: React.FC<ContestProps> = ({ user, students, onBack }) => {
     return [...students].sort((a, b) => b.completedTasks - a.completedTasks);
   }, [students]);
 
-  const userRank = leaderboard.findIndex(s => s.id === user.id) + 1;
+  const userRank = user ? leaderboard.findIndex(s => s.id === user.id) + 1 : 0;
   const personAbove = userRank > 1 ? leaderboard[userRank - 2] : null;
-  const diffAbove = personAbove ? personAbove.completedTasks - user.completedTasks : 0;
+  const diffAbove = personAbove && user ? personAbove.completedTasks - user.completedTasks : 0;
 
   const getRankBadge = (rank: number) => {
       if (rank === 1) return { icon: 'workspace_premium', color: 'text-yellow-400', bg: 'bg-yellow-400/10', label: 'Şampiyon' };

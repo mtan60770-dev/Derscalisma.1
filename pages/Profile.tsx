@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { User, Exam, ViewState, Badge } from '../types';
 import { generateProfileAvatar } from '../services/geminiService';
-import { RANKS, getRank, capitalize, FRAMES, LEVELS, getLevel } from '../constants';
+import { RANKS, getRank, capitalize, FRAMES, LEVELS, getLevel, getLevelStyle, DIAMOND_PACKAGES, SPECIAL_DIAMOND_PACKAGE, getPopularityLevel, POPULARITY_LEVELS, getPopularityProgress } from '../constants';
 import { LevelUpAnimation } from '../components/LevelUpAnimation';
 
 interface ProfileProps {
@@ -167,25 +167,82 @@ export const Profile: React.FC<ProfileProps> = ({ user, exams, onBack, onUpdateU
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [avatarPrompt, setAvatarPrompt] = useState('');
   const [showAddFriendBot, setShowAddFriendBot] = useState(false);
+  const [showPopularityLevels, setShowPopularityLevels] = useState(false);
   const [levelUp, setLevelUp] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState('');
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
 
-  const solved = useMemo(() => user.solvedQuestions || { total: 0, test: 0, classic: 0, performance: 0, bySubject: {} }, [user.solvedQuestions]);
-  const currentLevel = useMemo(() => getLevel(solved.total), [solved.total]);
+  useEffect(() => {
+    const now = Date.now();
+    if (user.activeItems) {
+      let diamondsToRemove = 0;
+      const remainingItems = user.activeItems.filter(item => {
+        if (item.name === 'Diamonds (80,000)' && item.expiryDate < now) {
+          diamondsToRemove += SPECIAL_DIAMOND_PACKAGE.amount;
+          return false;
+        }
+        return true;
+      });
+
+      if (diamondsToRemove > 0) {
+        onUpdateUser({
+          diamonds: Math.max(0, (user.diamonds || 0) - diamondsToRemove),
+          activeItems: remainingItems
+        });
+        triggerNotif("Süresi dolan 80.000 Elmas silindi.");
+      }
+    }
+  }, [user.activeItems]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const end = SPECIAL_DIAMOND_PACKAGE.startDate + SPECIAL_DIAMOND_PACKAGE.durationDays * 24 * 60 * 60 * 1000;
+      const diff = end - now;
+      if (diff <= 0) {
+        setTimeLeft('Sona erdi');
+      } else {
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        setTimeLeft(`${days}g ${hours}s`);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const solved = useMemo(() => {
+      console.log('DEBUG solvedQuestions:', user.solvedQuestions);
+      return user.solvedQuestions || { total: 0, test: 0, classic: 0, performance: 0, bySubject: {} };
+  }, [user.solvedQuestions]);
+  const currentLevel = useMemo(() => {
+      const level = getLevel(solved.total);
+      console.log('DEBUG Profile:', { total: solved.total, level });
+      return level;
+  }, [solved.total]);
   const currentLevelObj = useMemo(() => LEVELS.find(l => l.level === currentLevel) || LEVELS[0], [currentLevel]);
   const nextLevelObj = useMemo(() => LEVELS.find(l => l.level === currentLevel + 1), [currentLevel]);
-  const prevLevelMin = useMemo(() => currentLevel > 1 ? LEVELS.find(l => l.level === currentLevel - 1)?.minQuestions || 0 : 0, [currentLevel]);
+  const prevLevelMin = useMemo(() => {
+      const prev = currentLevel > 1 ? LEVELS.find(l => l.level === currentLevel - 1)?.minQuestions || 0 : 0;
+      console.log('DEBUG Profile prevLevelMin:', prev);
+      return prev;
+  }, [currentLevel]);
   const progress = useMemo(() => {
       if (!nextLevelObj) return 100;
-      return Math.min(100, Math.max(0, ((solved.total - prevLevelMin) / (nextLevelObj.minQuestions - prevLevelMin)) * 100));
+      const p = Math.min(100, Math.max(0, ((solved.total - prevLevelMin) / (nextLevelObj.minQuestions - prevLevelMin)) * 100));
+      console.log('DEBUG Profile progress:', { p, total: solved.total, prev: prevLevelMin, next: nextLevelObj.minQuestions });
+      return p;
   }, [solved.total, prevLevelMin, nextLevelObj]);
   const prevLevelRef = useRef(currentLevel);
 
+  const [lastDisplayedLevel, setLastDisplayedLevel] = useState<number | null>(null);
+
   useEffect(() => {
-    if (currentLevel > prevLevelRef.current) {
+    if (currentLevel > prevLevelRef.current && currentLevel !== lastDisplayedLevel) {
       setLevelUp(currentLevel);
+      setLastDisplayedLevel(currentLevel);
+      prevLevelRef.current = currentLevel;
     }
-    prevLevelRef.current = currentLevel;
-  }, [currentLevel]);
+  }, [currentLevel, lastDisplayedLevel]);
 
   const handleGenerateAvatar = async () => {
       if (!avatarPrompt.trim()) return;
@@ -226,7 +283,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, exams, onBack, onUpdateU
       }
   };
 
-  const currentFrame = LOCAL_FRAMES.find(f => f.id === user.frameId) || LOCAL_FRAMES[0];
+  const currentFrame = user ? (LOCAL_FRAMES.find(f => f.id === user.frameId) || LOCAL_FRAMES[0]) : LOCAL_FRAMES[0];
   const currentFrameClass = `${currentFrame.color} ${currentFrame.animation}`;
 
   const triggerNotif = (msg: string) => {
@@ -234,14 +291,30 @@ export const Profile: React.FC<ProfileProps> = ({ user, exams, onBack, onUpdateU
       setTimeout(() => setNotif(null), 3000);
   };
 
-  const currentRank = getRank(solved.total);
+  const now = Date.now();
+  const lastReset = user.lastRankReset || now;
+  const sixtyDaysInMs = 60 * 24 * 60 * 60 * 1000;
+  const isReset = now - lastReset > sixtyDaysInMs;
+
+  useEffect(() => {
+    if (isReset) {
+        onUpdateUser({
+            rankQuestions: 0,
+            lastRankReset: now
+        });
+        triggerNotif("Rütbeniz sıfırlandı!");
+    }
+  }, [isReset]);
+
+  const effectiveRankQuestions = isReset ? 0 : (user.rankQuestions ?? solved.total);
+  const currentRank = getRank(effectiveRankQuestions);
   const currentRankIndex = RANKS.findIndex(r => r.id === currentRank.id);
   const nextRank = currentRankIndex > 0 ? RANKS[currentRankIndex - 1] : null;
 
   let targetRank = null;
   if (user.targetRankId) {
     const selectedTarget = RANKS.find(r => r.id === user.targetRankId);
-    if (selectedTarget && selectedTarget.min > solved.total) {
+    if (selectedTarget && selectedTarget.min > effectiveRankQuestions) {
       targetRank = selectedTarget;
     }
   }
@@ -250,6 +323,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, exams, onBack, onUpdateU
   }
 
   const [showTargetRankModal, setShowTargetRankModal] = useState(false);
+  const [showDiamondStore, setShowDiamondStore] = useState(false);
 
   const examAnalysis = useMemo(() => {
     const subjectStats: Record<string, { totalScore: number; count: number; targetTotal: number }> = {};
@@ -300,7 +374,8 @@ export const Profile: React.FC<ProfileProps> = ({ user, exams, onBack, onUpdateU
         classic: solved.classic + manualQuestions.classic,
         performance: solved.performance,
         bySubject: newBySubject
-      }
+      },
+      rankQuestions: (user.rankQuestions ?? solved.total) + addedCount
     });
     setShowAddQuestions(false);
     triggerNotif(`${addedCount} Soru Başarıyla Eklendi!`);
@@ -339,6 +414,20 @@ export const Profile: React.FC<ProfileProps> = ({ user, exams, onBack, onUpdateU
                       <h3 className="text-sm font-black uppercase mb-4">GERİ BİLDİRİM GÖNDER</h3>
                       <textarea placeholder="Fikrini buraya yaz..." className="w-full h-32 bg-black/40 rounded-2xl p-4 border border-white/10 outline-none text-sm font-bold"></textarea>
                       <button onClick={() => { triggerNotif("Geri bildirim iletildi! Teşekkürler."); setShowSettings(false); }} className="w-full py-4 bg-primary text-white rounded-2xl font-black uppercase mt-4 active:scale-95 transition-transform">GÖNDER</button>
+                  </div>
+
+                  {/* Sınıf Bilgisi */}
+                  <div className="bg-white/5 p-8 rounded-[3rem] border border-white/10 space-y-4">
+                      <h3 className="text-sm font-black uppercase italic">SINIFINIZ</h3>
+                      <select 
+                          value={user.grade || 8} 
+                          onChange={(e) => onUpdateUser({ grade: Number(e.target.value) })}
+                          className="w-full bg-black/40 p-4 rounded-2xl border border-white/10 outline-none text-sm font-bold"
+                      >
+                          {[...Array(12)].map((_, i) => (
+                              <option key={i+1} value={i+1}>{i+1}. Sınıf</option>
+                          ))}
+                      </select>
                   </div>
 
                   {/* Güvenlik ve Gizlilik */}
@@ -797,22 +886,101 @@ export const Profile: React.FC<ProfileProps> = ({ user, exams, onBack, onUpdateU
                       )}
                   </div>
                   <div className="flex gap-2 justify-center mt-4">
+                      <div className="bg-black/40 px-6 py-3 rounded-2xl border border-white/10 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-yellow-400">favorite</span>
+                          <span className="font-black italic text-sm">{user.popularity || 0}</span>
+                      </div>
+                      <div className="bg-black/40 px-6 py-3 rounded-2xl border border-white/10 flex items-center gap-2 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setShowPopularityLevels(true)}>
+                          {(() => {
+                              const level = getPopularityLevel(user.popularity || 0);
+                              let visual = { icon: 'star', color: 'text-blue-400' };
+                              if (level >= 41) visual = { icon: 'rocket_launch', color: 'text-red-600' };
+                              else if (level >= 40) visual = { icon: 'workspace_premium', color: 'text-red-400' };
+                              else if (level >= 30) visual = { icon: 'military_tech', color: 'text-orange-400' };
+                              else if (level >= 20) visual = { icon: 'emoji_events', color: 'text-yellow-400' };
+                              else if (level >= 10) visual = { icon: 'workspace_premium', color: 'text-purple-400' };
+                              
+                              return <span className={`material-symbols-outlined ${visual.color}`}>{visual.icon}</span>;
+                          })()}
+                          <span className="font-black italic text-sm">Seviye {getPopularityLevel((user as any).levelProgress || 0)}</span>
+                      </div>
+                  </div>
+                  
+                  {/* Popularity Progress Bar */}
+                  <div className="w-full mt-6 px-12">
+                      <div className="w-full bg-black/40 rounded-full h-6 overflow-hidden border border-white/10 p-1">
+                          <div 
+                              className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-1000 ease-out" 
+                              style={{ 
+                                  width: `${(() => {
+                                      const popularity = (user as any).levelProgress || 0;
+                                      const level = getPopularityLevel(popularity);
+                                      const currentLevelMin = POPULARITY_LEVELS.find(l => l.level === level)?.min || 0;
+                                      const nextLevelMin = POPULARITY_LEVELS.find(l => l.level === level + 1)?.min || popularity;
+                                      const range = nextLevelMin - currentLevelMin;
+                                      const progress = range === 0 ? 100 : Math.min(100, Math.max(0, ((popularity - currentLevelMin) / range) * 100));
+                                      console.log('Progress Debug:', { popularity, level, currentLevelMin, nextLevelMin, progress });
+                                      return progress;
+                                  })()}%` 
+                              }}
+                          />
+                      </div>
+                      <p className="text-xs font-black text-white mt-2 text-center">
+                          {(() => {
+                              const progressVal = (user as any).levelProgress || 0;
+                              const level = getPopularityLevel(progressVal);
+                              if (level >= 41) return "Maksimum";
+                              const nextLevelMin = POPULARITY_LEVELS.find(l => l.level === level + 1)?.min || progressVal;
+                              return `${progressVal} / ${nextLevelMin} Puan`;
+                          })()}
+                      </p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 text-center">Popülerlik İlerlemesi</p>
+                  </div>
+                  
+                  {showPopularityLevels && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowPopularityLevels(false)}>
+                          <div className="bg-[#0F172A] border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+                              <div className="flex justify-between items-center mb-6">
+                                  <h3 className="text-2xl font-black italic uppercase tracking-tighter">Popülerlik Seviyeleri</h3>
+                                  <button onClick={() => setShowPopularityLevels(false)} className="text-slate-400 hover:text-white">
+                                      <span className="material-symbols-outlined">close</span>
+                                  </button>
+                              </div>
+                              <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+                                  {POPULARITY_LEVELS.map((level, index) => {
+                                      const currentLevel = getPopularityLevel((user as any).levelProgress || 0);
+                                      const isCurrent = currentLevel === level.level;
+                                      const isUnlocked = currentLevel >= level.level;
+                                      return (
+                                          <div key={index} className={`flex items-center justify-between p-4 rounded-2xl border ${isCurrent ? 'bg-indigo-900/40 border-indigo-500' : isUnlocked ? 'bg-white/10 border-white/10' : 'bg-white/5 border-white/5 opacity-60'}`}>
+                                              <div className="flex items-center gap-3">
+                                                  <span className={`material-symbols-outlined ${isUnlocked ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                                      {isUnlocked ? 'lock_open' : 'lock'}
+                                                  </span>
+                                                  <span className={`font-black ${isCurrent ? 'text-indigo-300' : isUnlocked ? 'text-white' : 'text-slate-500'}`}>Seviye {level.level}</span>
+                                              </div>
+                                              <span className="font-mono text-sm text-slate-300">{level.min.toLocaleString()} Puan</span>
+                                          </div>
+                                      );
+                                  })}
+                              </div>
+                          </div>
+                      </div>
+                  )}
+                  <div className="flex gap-2 justify-center mt-4">
                     <span className="bg-black/30 px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase border border-white/10">{user.grade}. SINIF</span>
-                   <span className="bg-black/30 px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase border border-white/10 flex items-center gap-1 text-yellow-500">
-                        <span className="material-symbols-outlined text-[10px]">star</span>
-                        {user.popularity || 0} POP
-                   </span>
-                    <div className="flex items-center gap-1 bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                    <div className="flex items-center gap-1 bg-white/5 px-3 py-1 rounded-full border border-white/10 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => { navigator.clipboard.writeText(`FOCUS-${user.id.toUpperCase()}`); alert("ID kopyalandı!"); }}>
                         <span className="text-[10px] text-slate-500 font-bold uppercase">ID:</span>
-                        <span className="text-[10px] text-slate-300 font-mono">{user.id}</span>
+                        <span className="text-[10px] text-slate-300 font-mono">FOCUS-{user.id.toUpperCase()}</span>
+                        <span className="material-symbols-outlined text-[10px] text-slate-500">content_copy</span>
                     </div>
                     <span className={`${currentRank.bg} px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase border ${currentRank.border} ${currentRank.color}`}>{currentRank.name}</span>
-                    <span className="bg-amber-500/20 text-amber-400 px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase border border-amber-500/30">SEVİYE {currentLevel}</span>
+                    <span className={`${getLevelStyle(currentLevel).bg} ${getLevelStyle(currentLevel).text} ${getLevelStyle(currentLevel).border} ${getLevelStyle(currentLevel).animation} px-5 py-2 rounded-full text-[10px] font-black tracking-widest uppercase border`}>SEVİYE {currentLevel}</span>
                   </div>
                   <div className="w-full mt-6 bg-black/40 rounded-full h-2 overflow-hidden border border-white/10">
                       <div className="bg-blue-500 h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
                   </div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">{solved.total} / {currentLevelObj.minQuestions} Soru</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">{solved.total} / {nextLevelObj?.minQuestions || solved.total} Soru</p>
               </div>
           </section>
 
@@ -903,6 +1071,13 @@ export const Profile: React.FC<ProfileProps> = ({ user, exams, onBack, onUpdateU
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-2">DİSİPLİN</p>
                           <p className="text-4xl font-black text-orange-500 italic leading-none mt-1">{user.streak}G</p>
                       </div>
+                      <div className="bg-[#1e293b] p-10 rounded-[3rem] border border-white/5 flex flex-col items-center gap-2">
+                          <span className="text-4xl">💎</span>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-2">ELMASLAR</p>
+                          <p className="text-4xl font-black text-blue-500 italic leading-none mt-1">{user.diamonds || 0}</p>
+                          <button onClick={() => setShowDiamondStore(true)} className="mt-2 px-4 py-2 bg-blue-500/20 text-blue-500 rounded-xl font-bold text-[10px] uppercase">YÜKLE</button>
+                      </div>
+
                       <div className="col-span-2 bg-gradient-to-r from-emerald-600/20 to-teal-600/20 p-10 rounded-[3.5rem] border border-emerald-500/20 flex items-center justify-between">
                           <div className="flex items-center gap-6">
                             <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg"><span className="material-symbols-outlined text-3xl">task_alt</span></div>
@@ -942,12 +1117,12 @@ export const Profile: React.FC<ProfileProps> = ({ user, exams, onBack, onUpdateU
                               <div className="relative z-10 bg-black/30 p-4 rounded-2xl border border-white/5">
                                   <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-3">
                                       <span className="text-slate-400 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">trending_up</span> İLERLEME DURUMU</span>
-                                      <span className={targetRank.color}>{solved.total} / {targetRank.min} SORU</span>
+                                      <span className={targetRank.color}>{effectiveRankQuestions} / {targetRank.min} SORU</span>
                                   </div>
                                   <div className="h-3 bg-slate-900 rounded-full overflow-hidden border border-white/5 p-0.5">
                                       <div 
                                           className={`h-full rounded-full bg-gradient-to-r ${targetRank.gradient} transition-all duration-1000 relative`}
-                                          style={{ width: `${Math.min((solved.total / targetRank.min) * 100, 100)}%` }}
+                                          style={{ width: `${Math.min((effectiveRankQuestions / targetRank.min) * 100, 100)}%` }}
                                       >
                                           <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_2s_infinite] -skew-x-12"></div>
                                       </div>
@@ -1541,6 +1716,52 @@ export const Profile: React.FC<ProfileProps> = ({ user, exams, onBack, onUpdateU
           </div>
       )}
 
+      {showDiamondStore && (
+          <div className="fixed inset-0 z-[700] bg-[#0F172A] flex flex-col p-8 animate-in slide-in-from-bottom duration-300 overflow-y-auto">
+              <header className="flex items-center justify-between mb-8">
+                  <h2 className="text-3xl font-black italic tracking-tighter uppercase text-blue-500">ELMAS YÜKLE</h2>
+                  <button onClick={() => setShowDiamondStore(false)} className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center"><span className="material-symbols-outlined">close</span></button>
+              </header>
+              <div className="grid grid-cols-2 gap-4">
+                  {new Date().getTime() < SPECIAL_DIAMOND_PACKAGE.startDate + SPECIAL_DIAMOND_PACKAGE.durationDays * 24 * 60 * 60 * 1000 && (
+                      <button onClick={() => {
+                          onUpdateUser({
+                            diamonds: (user.diamonds || 0) + SPECIAL_DIAMOND_PACKAGE.amount,
+                            activeItems: [
+                                ...(user.activeItems || []),
+                                {
+                                    name: 'Diamonds (80,000)',
+                                    expiryDate: new Date().getTime() + SPECIAL_DIAMOND_PACKAGE.durationDays * 24 * 60 * 60 * 1000
+                                }
+                            ]
+                          });
+                          setShowDiamondStore(false);
+                          triggerNotif("80.000 Elmas yüklendi! (25 Günlük)");
+                      }} className="col-span-2 bg-gradient-to-r from-yellow-500 to-amber-600 p-4 rounded-2xl border border-white/20 flex flex-col items-center gap-1 shadow-glow animate-pulse">
+                          <span className="text-3xl font-black text-white">{SPECIAL_DIAMOND_PACKAGE.amount} Elmas</span>
+                          <span className="text-sm font-bold text-white">{SPECIAL_DIAMOND_PACKAGE.price} TL</span>
+                          <span className="text-[10px] font-black uppercase bg-black/20 px-2 py-1 rounded-full mt-1">Süre: {timeLeft}</span>
+                      </button>
+                  )}
+                  {DIAMOND_PACKAGES.map(pkg => (
+                      <div key={pkg.amount} onClick={() => {
+                          const qty = quantities[pkg.amount] || 1;
+                          onUpdateUser({ diamonds: (user.diamonds || 0) + (pkg.amount * qty) });
+                          setShowDiamondStore(false);
+                      }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { const qty = quantities[pkg.amount] || 1; onUpdateUser({ diamonds: (user.diamonds || 0) + (pkg.amount * qty) }); setShowDiamondStore(false); } }} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col items-center gap-2 cursor-pointer">
+                          <span className="text-2xl font-black text-blue-400">{pkg.amount}</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase">{pkg.amount} Adet</span>
+                          <span className="text-xs font-bold">{pkg.price * (quantities[pkg.amount] || 1)} TL</span>
+                          <div className="flex items-center gap-2 mt-2">
+                              <button onClick={(e) => { e.stopPropagation(); setQuantities(prev => ({...prev, [pkg.amount]: Math.max(1, (prev[pkg.amount] || 1) - 1) }))}} className="w-6 h-6 bg-white/10 rounded-full flex items-center justify-center">-</button>
+                              <span className="text-xs font-bold">{quantities[pkg.amount] || 1} Adet</span>
+                              <button onClick={(e) => { e.stopPropagation(); setQuantities(prev => ({...prev, [pkg.amount]: (prev[pkg.amount] || 1) + 1 }))}} className="w-6 h-6 bg-white/10 rounded-full flex items-center justify-center">+</button>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
+      )}
       {/* Claiming Badge Modal */}
       {claimingBadge && (
           <div className="fixed inset-0 z-[3000] bg-black/90 flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">

@@ -130,7 +130,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ tasks }) => {
                     return (
                         <div key={subject} className="bg-white dark:bg-card-dark p-4 rounded-xl border border-gray-100 dark:border-gray-800 flex items-center gap-4">
                             <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center text-white font-bold`}>
-                                {subject.charAt(0)}
+                                {subject ? subject.charAt(0) : ''}
                             </div>
                             <div className="flex-1">
                                 <div className="flex justify-between mb-1">

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Task, User, ViewState, Exam, Mission } from '../types';
 import { streamAssistantResponse, checkContentModeration } from '../services/geminiService';
@@ -216,7 +215,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
          </section>
 
          {/* Titan 20 Special Event Banner */}
-         {Date.now() < new Date('2026-04-13T15:38:41Z').getTime() && (
             <section className="px-2 space-y-4">
                 <div 
                     onClick={() => onChangeView(ViewState.SPECIAL_EVENT_20)}
@@ -301,16 +299,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </span>
                 </div>
             </section>
-         )}
 
          {/* Hero Action */}
-         <div onClick={() => onChangeView(ViewState.AI_TEST)} className="bg-gradient-to-br from-tg-blue via-indigo-600 to-purple-700 p-8 rounded-[3.5rem] shadow-2xl relative overflow-hidden active:scale-95 transition-transform group cursor-pointer">
-             <div className="absolute top-[-20%] right-[-10%] opacity-10 group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-[150px]">quiz</span></div>
-             <div className="relative z-10">
-                 <h2 className="text-2xl font-black italic tracking-tighter uppercase leading-none mb-2">AI TEST ARENASI</h2>
-                 <p className="text-[10px] font-black text-white/60 uppercase tracking-widest">Yapay Zeka ile Kendini Sına</p>
-                 <button className="mt-6 bg-white text-black px-6 py-2 rounded-full font-black text-[10px] uppercase italic tracking-tighter">BAŞLA</button>
-             </div>
+         <div className="grid grid-cols-2 gap-4 mb-8">
+            <div onClick={() => onChangeView(ViewState.AI_TEST)} className="bg-gradient-to-br from-tg-blue via-indigo-600 to-purple-700 p-8 rounded-[3.5rem] shadow-2xl flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform">
+                <span className="material-symbols-outlined text-4xl mb-2">quiz</span>
+                <span className="font-black text-[10px] uppercase italic">AI TEST</span>
+            </div>
+            <div onClick={() => onChangeView(ViewState.AI_VS_ARENA)} className="bg-gradient-to-br from-emerald-600 to-teal-800 p-8 rounded-[3.5rem] shadow-2xl flex flex-col items-center text-center cursor-pointer active:scale-95 transition-transform">
+                <span className="material-symbols-outlined text-4xl mb-2">emoji_events</span>
+                <span className="font-black text-[10px] uppercase italic">1VS1 ARENA</span>
+            </div>
          </div>
 
          <div className="grid grid-cols-2 gap-4">

@@ -70,10 +70,18 @@ export const DailyBonus: React.FC<DailyBonusProps> = ({ user, onClaim, onBack })
     setRewardAmount(amount);
 
     setTimeout(() => {
-        onClaim(amount);
-        setIsClaiming(false);
-        setShowChestAnimation(false);
-        setRewardAmount(null);
+        const success = onClaim(amount);
+        if (success) {
+            setIsClaiming(false);
+            setShowChestAnimation(false);
+            setRewardAmount(null);
+        } else {
+            // Hata durumu
+            setIsClaiming(false);
+            setShowChestAnimation(false);
+            setRewardAmount(null);
+            alert("Bonus alınırken bir hata oluştu.");
+        }
     }, 3000); // Animation duration
   };
 
